@@ -1,8 +1,8 @@
-import TTSDemo from './TTSDemo';
+import TTS from './TTS';
 
 function App() {
   return (
-    <TTSDemo />
+    <TTS />
   );
 }
 
