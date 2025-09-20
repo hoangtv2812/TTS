@@ -1,42 +1,39 @@
-version: '3.8'
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: tts_postgres_db
-    restart: always
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_DATABASE}
-    ports:
-      - "5432:5432"
-    volumes:
-      - ./backend/pgdata:/var/lib/postgresql/data
-    env_file:
-      - ./backend/.env
+  # db:
+  #   image: postgres:15-alpine
+  #   container_name: tts_postgres_db
+  #   restart: always
+  #   environment:
+  #     POSTGRES_USER: ${DB_USER}
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD}
+  #     POSTGRES_DB: ${DB_DATABASE}
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - ./backend/pgdata:/var/lib/postgresql/data
+  #   env_file:
+  #     - ./backend/.env
 
-  backend:
-    build:
-      context: ./backend
-    container_name: tts_backend
-    restart: always
-    depends_on:
-      - db
-    ports:
-      - "3001:3001"
-    volumes:
-      - ./backend/src:/usr/src/app/src
-    env_file:
-      - ./backend/.env
-    command: npm run dev
+  # backend:
+  #   build:
+  #     context: ./backend
+  #   container_name: tts_backend
+  #   restart: always
+  #   depends_on:
+  #     - db
+  #   ports:
+  #     - "3001:3001"
+  #   volumes:
+  #     - ./backend/src:/usr/src/app/src
+  #   env_file:
+  #     - ./backend/.env
+  #   command: npm run dev
 
   frontend:
     build:
       context: ./frontend
     container_name: tts_frontend
     restart: always
-    depends_on:
-      - backend
     ports:
       - "5173:5173"
     volumes:
