@@ -15,4 +15,4 @@ COPY . .
 EXPOSE 5173
 
 # Run dev server, --host is needed to expose it outside the container
-CMD ["npm", "run", "dev", "--", "--host"] 
+CMD ["npm", "run", "dev", "--", "--host"]

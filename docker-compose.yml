@@ -1,40 +1,74 @@
 services:
-  # db:
-  #   image: postgres:15-alpine
-  #   container_name: tts_postgres_db
-  #   restart: always
-  #   environment:
-  #     POSTGRES_USER: ${DB_USER}
-  #     POSTGRES_PASSWORD: ${DB_PASSWORD}
-  #     POSTGRES_DB: ${DB_DATABASE}
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - ./backend/pgdata:/var/lib/postgresql/data
-  #   env_file:
-  #     - ./backend/.env
-
-  # backend:
-  #   build:
-  #     context: ./backend
-  #   container_name: tts_backend
-  #   restart: always
-  #   depends_on:
-  #     - db
-  #   ports:
-  #     - "3001:3001"
-  #   volumes:
-  #     - ./backend/src:/usr/src/app/src
-  #   env_file:
-  #     - ./backend/.env
-  #   command: npm run dev
-
-  frontend:
-    build:
-      context: ./frontend
-    container_name: tts_frontend
+  db:
+    image: postgres:17.0
+    container_name: tts_postgresql
     restart: always
     ports:
-      - "5173:5173"
+      - 5434:5432
+    env_file:
+      - "./backend/docker/docker-compose.env"
     volumes:
-      - ./frontend/src:/usr/src/app/src
+      - tts_postgres_data:/var/lib/postgresql/data
+    networks:
+      tts_network:
+        aliases:
+          - tts_postgres
+  adminer:
+    image: adminer
+    container_name: tts_adminer
+    restart: always
+    volumes:
+      - ./backend/docker/adminer.css:/var/www/html/adminer.css
+    ports:
+      - 8083:8080
+    networks:
+      tts_network:
+        aliases:
+          - tts_adminer
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tts_backend
+    env_file:
+      - "./backend/docker/docker-compose.env"
+    working_dir: /usr/src/app
+    volumes:
+      - ./backend:/usr/src/app
+      - backend_node_modules:/usr/src/app/node_modules
+    ports:
+      - "3000:3000"
+    command: npm run dev
+    networks:
+      tts_network:
+        aliases:
+          - tts_backend
+  frontend:
+    image: tts_frontend:dev
+    container_name: tts_frontend
+    volumes:
+      - ./frontend/:/app
+      - frontend_node_modules:/usr/src/app/node_modules
+    ports:
+      - "5173:5173"
+    networks:
+      tts_network:
+        aliases:
+          - tts_frontend
+networks:
+  tts_network:
+    name: "tts_network"
+volumes:
+  tts_postgres_data:
+  backend_node_modules:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${PWD}/backend/node_modules
+  frontend_node_modules:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${PWD}/frontend/node_modules
