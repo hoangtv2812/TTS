@@ -1,0 +1,70 @@
+services:
+  backend:
+    image: your_repo/tts_prod_backend
+    env_file:
+      - "./backend/docker/docker-compose.env"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend/public:/app/public
+    deploy:
+      mode: replicated
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+        delay: 5s
+      rollback_config:
+        parallelism: 0
+        order: stop-first
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 5s
+    healthcheck:
+      interval: 30s
+      retries: 3
+      timeout: 10s
+      start_period: 20s
+      test:
+        ["CMD-SHELL", "curl -sf http://localhost:3000/health_check || exit 1"]
+    networks:
+      tts_network:
+        aliases:
+          - tts_prod_backend
+  frontend:
+    image: your_repo/tts_prod_frontend
+    ports:
+      - "5173:5173"
+    deploy:
+      mode: replicated
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+        delay: 5s
+      rollback_config:
+        parallelism: 0
+        order: stop-first
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 5s
+    healthcheck:
+      interval: 30s
+      retries: 3
+      timeout: 10s
+      start_period: 5s
+      test: ["CMD-SHELL", "curl -sf http://localhost:5173 || exit 1"]
+    networks:
+      tts_network:
+        aliases:
+          - tts_prod_frontend
+
+networks:
+  tts_network:
+    name: "tts_network_prod"

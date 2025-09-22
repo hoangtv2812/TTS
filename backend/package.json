@@ -1,11 +1,12 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "main": "dist/server.js",
+  "main": "dist/bin/www.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/server.js",
-    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/server.ts",
+    "start": "node dist/bin/www.js",
+    "prod": "node dist/bin/www.js",
+    "dev": "npx tsx ./bin/www.ts",
     "knex:migrate:make": "knex migrate:make -x ts",
     "knex:migrate:latest": "knex migrate:latest --knexfile knexfile.ts",
     "knex:seed:make": "knex seed:make -x ts",
@@ -26,6 +27,7 @@
     "@types/node": "^24.5.0",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
+    "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }
 }
