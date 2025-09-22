@@ -37,7 +37,7 @@ services:
       - ./backend:/usr/src/app
       - backend_node_modules:/usr/src/app/node_modules
     ports:
-      - "3000:3000"
+      - "3001:3001"
     command: npm run dev
     networks:
       tts_network:

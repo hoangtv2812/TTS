@@ -3,7 +3,7 @@ up:
 build_backend:
 	cd backend && docker build -f Dockerfile --platform linux/amd64 -t tts_backend:dev .
 dev_backend:
-	docker rm -f tts_backend || true && docker compose run --name tts_backend -p 3000:3000 backend
+	docker rm -f tts_backend || true && docker compose run --name tts_backend -p 3001:3001 backend
 exec_backend:
 	docker exec -it tts_backend sh
 

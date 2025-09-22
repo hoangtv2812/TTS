@@ -4,7 +4,7 @@ services:
     env_file:
       - "./backend/docker/docker-compose.env"
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - ./backend/public:/app/public
     deploy:
@@ -29,7 +29,7 @@ services:
       timeout: 10s
       start_period: 20s
       test:
-        ["CMD-SHELL", "curl -sf http://localhost:3000/health_check || exit 1"]
+        ["CMD-SHELL", "curl -sf http://localhost:3001/health_check || exit 1"]
     networks:
       tts_network:
         aliases:
