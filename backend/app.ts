@@ -1,8 +1,19 @@
 import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors'; // Import cors
 
 import v1Router from './routes/v1';
 
 const app = express();
+
+app.use(cors(
+  {
+    credentials: true,
+    origin: [
+      'http://localhost:5173', // Vite dev server
+      'http://127.0.0.1:5173',
+    ],
+  }
+)); // Use cors middleware
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
