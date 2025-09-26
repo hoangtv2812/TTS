@@ -26,16 +26,14 @@ services:
         aliases:
           - tts_adminer
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: tts_backend:dev
     container_name: tts_backend
     env_file:
       - "./backend/docker/docker-compose.env"
     working_dir: /usr/src/app
     volumes:
       - ./backend:/usr/src/app
-      - backend_node_modules:/usr/src/app/node_modules
+      # - backend_node_modules:/usr/src/app/node_modules
     ports:
       - "3001:3001"
     command: npm run dev

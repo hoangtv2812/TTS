@@ -1,14 +1,14 @@
 up:
 	docker compose up -d db adminer
 build_backend:
-	cd backend && docker build -f Dockerfile --platform linux/amd64 -t tts_backend:dev .
+	cd backend && docker build --no-cache -f Dockerfile --platform linux/amd64 -t tts_backend:dev .
 dev_backend:
 	docker rm -f tts_backend || true && docker compose run --name tts_backend -p 3001:3001 backend
 exec_backend:
 	docker exec -it tts_backend sh
 
 build_frontend:
-	cd frontend && docker build -f Dockerfile --platform=linux/amd64 -t tts_frontend:dev .
+	cd frontend && docker build --no-cache -f Dockerfile --platform=linux/amd64 -t tts_frontend:dev .
 dev_frontend:
 	docker rm -f tts_frontend || true && docker compose run --name tts_frontend -p 5173:5173 frontend
 exec_frontend:
