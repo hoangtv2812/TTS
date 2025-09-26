@@ -68,8 +68,8 @@ const TTSDemo: React.FC = () => {
               </div>
 
               <div className="mb-5">
-                <label htmlFor="voice-select" className="block text-sm font-medium text-gray-700 mb-2">
-                  Chọn giọng đọc
+                <label htmlFor="voice-select" className="block text -sm font-medium text-gray-700 mb-2">
+                  Chọn giọng đọc:
                 </label>
                 <select
                   id="voice-select"
