@@ -3,11 +3,12 @@ FROM node:22-alpine
 
 # Create app directory
 WORKDIR /usr/src/app
+RUN apk add --no-cache curl
 
 # Install app dependencies
 COPY package*.json ./
 
-RUN npm install
+RUN npm ci
 RUN npm install -g pm2
 
 # Bundle app source
