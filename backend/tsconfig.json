@@ -8,6 +8,6 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "knexfile.ts"],
+  "include": ["**/*.ts"],
   "exclude": ["node_modules"]
 }
