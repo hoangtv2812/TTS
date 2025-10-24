@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import _axios from './helpers/axiosHelpers';
 
 const TTSDemo: React.FC = () => {
   const [text, setText] = useState('');
@@ -19,9 +20,23 @@ const TTSDemo: React.FC = () => {
     setSelectedVoice(event.target.value);
   };
 
-  const handleRead = () => {
+  const handleRead = async () => {
     console.log('Reading text:', text, 'with voice:', selectedVoice);
-    alert(`Đọc với giọng: ${selectedVoice}. Chức năng sẽ được triển khai sau.`);
+    try {
+      const response = await _axios({
+        method: 'post',
+        url: '/api/v1/synthesize',
+        body: {
+          text,
+          voice: selectedVoice,
+        },
+      });
+      console.log('Backend response:', response.data);
+      alert(`Đọc với giọng: ${selectedVoice}. Backend đã nhận được yêu cầu.`);
+    } catch (error) {
+      console.error('Error calling backend:', error);
+      alert('Có lỗi xảy ra khi gọi backend.');
+    }
   };
 
   const handleDownload = () => {
