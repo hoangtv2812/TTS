@@ -1,17 +1,48 @@
 services:
-  backend:
-    image: your_repo/tts_prod_backend
-    env_file:
-      - "./backend/docker/docker-compose.env"
+  gateway:
+    image: ecomobile/server_image:tts_gateway
     ports:
-      - "3001:3001"
+      - "80:80"
+    deploy:
+      mode: replicated
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+        delay: 5s
+      rollback_config:
+        parallelism: 0
+        order: stop-first
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 5s
+    networks:
+      tts_network:
+        aliases:
+          - tts_gateway
+    depends_on:
+      - backend
+      - frontend
+
+  backend:
+    image: ecomobile/server_image:tts_backend
+    # Ports removed to secure service behind gateway
     volumes:
       - ./backend/public:/app/public
+    env_file:
+      - "./backend/docker/docker-compose.env"
+    networks:
+      tts_network:
+        aliases:
+          - tts_backend
     deploy:
       mode: replicated
       replicas: 1
       update_config:
-        parallelism: 1
+        parallelism: 2
         order: start-first
         failure_action: rollback
         delay: 5s
@@ -24,25 +55,21 @@ services:
         max_attempts: 3
         window: 5s
     healthcheck:
-      interval: 30s
-      retries: 3
-      timeout: 10s
-      start_period: 20s
       test:
-        ["CMD-SHELL", "curl -sf http://localhost:3001/health_check || exit 1"]
+        ["CMD-SHELL", "curl -f http://127.0.0.1:3001/ || exit 1"]
+
+  frontend:
+    image: ecomobile/server_image:tts_frontend
+    # Ports removed to secure service behind gateway
     networks:
       tts_network:
         aliases:
-          - tts_prod_backend
-  frontend:
-    image: your_repo/tts_prod_frontend
-    ports:
-      - "5173:5173"
+          - tts_frontend
     deploy:
       mode: replicated
       replicas: 1
       update_config:
-        parallelism: 1
+        parallelism: 2
         order: start-first
         failure_action: rollback
         delay: 5s
@@ -55,16 +82,9 @@ services:
         max_attempts: 3
         window: 5s
     healthcheck:
-      interval: 30s
-      retries: 3
-      timeout: 10s
-      start_period: 5s
-      test: ["CMD-SHELL", "curl -sf http://localhost:5173 || exit 1"]
-    networks:
-      tts_network:
-        aliases:
-          - tts_prod_frontend
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:80 || exit 1"]
 
 networks:
   tts_network:
     name: "tts_network_prod"
+

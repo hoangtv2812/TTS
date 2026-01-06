@@ -3,14 +3,14 @@ up:
 build_backend:
 	cd backend && docker build --no-cache -f Dockerfile -t tts_backend:dev .
 dev_backend:
-	docker rm -f tts_backend || true && docker-compose run --name tts_backend -p 3001:3001 backend
+	docker rm -f tts_backend || true && docker compose run --name tts_backend -p 3001:3001 backend
 exec_backend:
 	docker exec -it tts_backend sh
 
 build_frontend:
 	cd frontend && docker build --no-cache -f Dockerfile -t tts_frontend:dev .
 dev_frontend:
-	docker rm -f tts_frontend || true && docker-compose run --name tts_frontend -p 5173:5173 frontend
+	docker rm -f tts_frontend || true && docker volume rm tts_frontend_node_modules || true && docker compose run --name tts_frontend -p 5173:5173 frontend
 exec_frontend:
 	docker exec -it tts_frontend sh
 
@@ -24,99 +24,33 @@ test:
 test_coverage:
 	docker exec -it tts_backend sh -c "npm run test:coverage"
 
-build_backend_staging:
-	cd backend && docker build -f Dockerfile.prod --platform linux/amd64 -t your_repo/tts_staging_backend .
-build_push_backend_staging:
-	cd backend && docker build -f Dockerfile.prod --platform linux/amd64 -t your_repo/tts_staging_backend . && docker push your_repo/tts_staging_backend
-build_frontend_staging:
-	cd frontend && docker build -f Dockerfile.prod --platform linux/amd64 -t your_repo/tts_staging_frontend .
-build_push_frontend_staging:
-	cd frontend && docker build -f Dockerfile.prod --platform linux/amd64 -t your_repo/tts_staging_frontend . && docker push your_repo/tts_staging_frontend
-
+# Production build and push commands
 build_backend_prod:
-	cd backend && docker build -f Dockerfile.prod --platform linux/amd64 -t your_repo/tts_backend .
+	cd backend && docker build -f Dockerfile.prod --platform linux/amd64 -t vhoang2812/server_image:tts_backend .
 build_push_backend_prod:
-	cd backend && docker build -f Dockerfile.prod --platform linux/amd64 -t your_repo/tts_backend . && docker push your_repo/tts_backend
+	cd backend && docker build -f Dockerfile.prod -t vhoang2812/server_image:tts_backend . && docker push vhoang2812/server_image:tts_backend
 build_frontend_prod:
-	cd frontend && docker build -f Dockerfile.prod --platform linux/amd64 -t your_repo/tts_frontend .
+	cd frontend && docker build -f Dockerfile.prod -t vhoang2812/server_image:tts_frontend .
 build_push_frontend_prod:
-	cd frontend && docker build -f Dockerfile.prod --platform linux/amd64 -t your_repo/tts_frontend . && docker push your_repo/tts_frontend
+	cd frontend && docker build -f Dockerfile.prod -t vhoang2812/server_image:tts_frontend . && docker push vhoang2812/server_image:tts_frontend
+build_gateway_prod:
+	cd nginx_gateway && docker build -f Dockerfile --platform linux/amd64 -t vhoang2812/server_image:tts_gateway .
+build_push_gateway_prod:
+	cd nginx_gateway && docker build -f Dockerfile -t vhoang2812/server_image:tts_gateway . && docker push vhoang2812/server_image:tts_gateway
 
-pull_backend_staging:
-	docker pull your_repo/tts_staging_backend
-pull_frontend_staging:
-	docker pull your_repo/tts_staging_frontend
-pull_staging:
-	docker pull your_repo/tts_staging_backend & docker pull your_repo/tts_staging_frontend
-
-pull_backend:
-	docker pull your_repo/tts_backend
-pull_frontend:
-	docker pull your_repo/tts_frontend
-pull:
-	docker pull your_repo/tts_backend & docker pull your_repo/tts_frontend
-
+# Production deployment to Docker Swarm
 swarm:
 	docker swarm init --advertise-addr 127.0.0.1
 stack:
-	docker stack deploy --compose-file docker-compose.yml tts
-deploy_local_backend:
+	docker stack deploy --compose-file docker-compose.prod.yml tts
+force_backend:
 	docker service update --force tts_backend
-deploy_local_frontend:
+force_frontend:
 	docker service update --force tts_frontend
+force_gateway:
+	docker service update --force tts_gateway
 
-confirm_staging:
-	@echo "🔐 Do you want to deploy STAGING? Type 'staging' to continue:"
-	@read -p "> " first; \
-	if [ "$$first" != "staging" ]; then \
-		echo "❌ First confirmation failed."; \
-		exit 1; \
-	fi
-	@echo "✅ Confirmations passed!"
-
-deploy_staging: confirm_staging
-	git checkout master
-	git pull origin master
-
-	git branch -D staging_deployment || true
-	git checkout -b staging_deployment
-	git push origin staging_deployment -f
-
-	git branch -D staging_be_fe_deployment || true
-	git checkout -b staging_be_fe_deployment
-	git push origin staging_be_fe_deployment -f
-
-	git checkout master
-
-deploy_staging_backend: confirm_staging
-	git checkout master
-	git pull origin master
-
-	git branch -D staging_deployment || true
-	git checkout -b staging_deployment
-	git push origin staging_deployment -f
-
-	git branch -D staging_backend_deployment || true
-	git checkout -b staging_backend_deployment
-	git push origin staging_backend_deployment -f
-
-	git checkout master
-
-deploy_staging_frontend: confirm_staging
-	git checkout master
-	git pull origin master
-
-	git branch -D staging_deployment || true
-	git checkout -b staging_deployment
-	git push origin staging_deployment -f
-
-	git branch -D staging_frontend_deployment || true
-	git checkout -b staging_frontend_deployment
-	git push origin staging_frontend_deployment -f
-
-	git checkout master
-
-
+# Deployment commands with safety confirmations
 confirm_production:
 	@echo "🔐 Do you want to deploy PRODUCTION? Type 'production' to continue:"
 	@read -p "> " first; \
@@ -133,44 +67,29 @@ confirm_production:
 	fi
 	@echo "✅ Confirmations passed!"
 
+deploy_backend_production: confirm_production
+	@echo "🚀 Starting production backend deployment..."
+	git checkout master
+	git pull origin master
+	git branch -D deploy-backend-production || true
+	git checkout -b deploy-backend-production
+	git push origin deploy-backend-production -f
+	git checkout master
+
+deploy_frontend_production: confirm_production
+	@echo "🚀 Starting production frontend deployment..."
+	git checkout master
+	git pull origin master
+	git branch -D deploy-frontend-production || true
+	git checkout -b deploy-frontend-production
+	git push origin deploy-frontend-production -f
+	git checkout master
+
 deploy_production: confirm_production
+	@echo "🚀 Starting full production deployment (backend + frontend + gateway)..."
 	git checkout master
 	git pull origin master
-
-	git branch -D deployment || true
-	git checkout -b deployment
-	git push origin deployment -f
-
-	git branch -D be_fe_deployment || true
-	git checkout -b be_fe_deployment
-	git push origin be_fe_deployment -f
-
-	git checkout master
-
-deploy_production_backend: confirm_production
-	git checkout master
-	git pull origin master
-
-	git branch -D deployment || true
-	git checkout -b deployment
-	git push origin deployment -f
-
-	git branch -D backend_deployment || true
-	git checkout -b backend_deployment
-	git push origin backend_deployment -f
-
-	git checkout master
-
-deploy_production_frontend: confirm_production
-	git checkout master
-	git pull origin master
-
-	git branch -D deployment || true
-	git checkout -b deployment
-	git push origin deployment -f
-
-	git branch -D frontend_deployment || true
-	git checkout -b frontend_deployment
-	git push origin frontend_deployment -f
-
+	git branch -D deploy-production || true
+	git checkout -b deploy-production
+	git push origin deploy-production -f
 	git checkout master

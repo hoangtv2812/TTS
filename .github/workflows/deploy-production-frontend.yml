@@ -1,0 +1,274 @@
+name: Frontend CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - deploy-frontend-production
+
+jobs:
+  build_push_frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-frontend_${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-frontend-
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: vhoang2812
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile.prod
+          push: true
+          tags: vhoang2812/server_image:tts_frontend_${{ github.sha }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+          build-args: |
+            VITE_BACKEND_SERVER=${{ secrets.VITE_BACKEND_SERVER }}
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  deploy_frontend:
+    needs: build_push_frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Deploy frontend to VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST_TTS }}
+          username: ${{ secrets.SERVER_USER_TTS }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_TTS }}
+          port: ${{ secrets.SERVER_PORT_TTS }}
+          script: |
+            set -e
+            set -o pipefail
+
+            cd /workspace/tts || { echo "❌ Failed to change directory"; exit 1; }
+
+            HEALTH_CHECK_TIMEOUT=65
+            STACK_NAME=tts
+            SERVICE_NAME=tts_frontend
+            EXPECT_IMAGE_TAG=vhoang2812/server_image:tts_frontend_${{ github.sha }}
+
+            # Git operations
+            git fetch origin deploy-frontend-production || { echo "❌ Failed to fetch from origin"; exit 1; }
+            git add . || { echo "❌ Failed to stage changes"; exit 1; }
+            git checkout -f || { echo "❌ Failed to force checkout"; exit 1; }
+            git checkout deploy-frontend-production || git checkout -b deploy-frontend-production origin/deploy-frontend-production || { echo "❌ Failed to checkout deploy-frontend-production branch"; exit 1; }
+            git reset --hard origin/deploy-frontend-production || { echo "❌ Failed to reset to latest deploy-frontend-production"; exit 1; }
+
+            # Docker login
+            echo "🔐 Logging in to Docker Hub..."
+            echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u vhoang2812 --password-stdin || { echo "❌ Failed to login to Docker Hub"; exit 1; }
+
+            # Pull frontend image with retry and timeout
+            echo "⬇️ Pulling frontend image..."
+            if ! timeout 300 docker pull "$EXPECT_IMAGE_TAG"; then
+              echo "❌ Failed to pull frontend image"
+              exit 1
+            fi
+
+            # Prepare docker-compose file
+            echo "🛠 Creating temporary docker-compose.deploy.yml..."
+            cp docker-compose.prod.yml docker-compose.deploy.yml || { echo "❌ Failed to copy docker-compose"; exit 1; }
+
+            echo "🔁 Updating image tag with SHA..."
+            sed -i "s|image: .*/server_image:tts_frontend.*|image: ${EXPECT_IMAGE_TAG}|g" docker-compose.deploy.yml || { echo "❌ Failed to update frontend image"; exit 1; }
+
+            # Initialize Docker Swarm if needed
+            docker swarm init --advertise-addr 127.0.0.1 || true
+
+            # Determine current image and decide update strategy
+            RUNNING_IMAGE_TAG=$(docker service inspect "$SERVICE_NAME" --format '{{(index .Spec.TaskTemplate.ContainerSpec.Image)}}' 2>/dev/null || echo "not_found")
+            RUNNING_IMAGE_TAG=${RUNNING_IMAGE_TAG%@*}
+            echo "RUNNING_IMAGE_TAG=$RUNNING_IMAGE_TAG"
+            echo "EXPECT_IMAGE_TAG=$EXPECT_IMAGE_TAG"
+
+            if [ "$RUNNING_IMAGE_TAG" = "$EXPECT_IMAGE_TAG" ]; then
+              echo "♻️ Same image, force update"
+              docker service update --force "$SERVICE_NAME" || { echo "❌ Failed to force update service"; exit 1; }
+            else
+              echo "🚀 New image, deploy stack"
+              docker stack deploy --with-registry-auth --compose-file docker-compose.deploy.yml "$STACK_NAME" || { echo "❌ Failed to deploy stack"; exit 1; }
+            fi
+
+            sleep 10
+
+            echo "⏳ Waiting for containers of service '$SERVICE_NAME' to be healthy..."
+            HEALTH_CHECK_START=$(date +%s)
+            while true; do
+              CURRENT_TIME=$(date +%s)
+              ELAPSED=$((CURRENT_TIME - HEALTH_CHECK_START))
+
+              if (( ELAPSED > HEALTH_CHECK_TIMEOUT )); then
+                echo "❌ Timeout waiting for health checks after ${ELAPSED}s."
+                echo "Service tasks status:"
+                docker service ps "$SERVICE_NAME" --no-trunc
+                exit 1
+              fi
+
+              service_tasks=$(docker service ps "$SERVICE_NAME" --filter desired-state=running --format '{{.ID}}\t{{.Name}}\t{{.Image}}\t{{.CurrentState}}' --no-trunc)
+              unhealthy_count=0
+              total_new_count=0
+              old_healthy_count=0
+
+              if [ -n "$service_tasks" ]; then
+                while IFS=$'\t' read -r task_id task_name task_image task_state; do
+                  [ -z "$task_id" ] && continue
+                  clean_task_image=$(echo "$task_image" | cut -d'@' -f1)
+
+                  if [ "$clean_task_image" = "$EXPECT_IMAGE_TAG" ]; then
+                    total_new_count=$((total_new_count + 1))
+
+                    container_id=$(docker ps --filter "label=com.docker.swarm.task.id=${task_id}" --format '{{.ID}}' | head -n1)
+
+                    if [ -n "$container_id" ]; then
+                      health_status=$(docker inspect "$container_id" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' 2>/dev/null)
+                      if [ "$health_status" != "healthy" ] && [ "$health_status" != "no-healthcheck" ]; then
+                        unhealthy_count=$((unhealthy_count + 1))
+                        echo "⚠️ New container $task_name: $health_status ($task_state) [${ELAPSED}s elapsed]"
+                      else
+                        echo "✅ New container $task_name: $health_status [${ELAPSED}s elapsed]"
+                      fi
+                    else
+                      unhealthy_count=$((unhealthy_count + 1))
+                      echo "⏳ Waiting for new container of task ${task_id:0:12} to start... [${ELAPSED}s elapsed]"
+                    fi
+                  else
+                    container_id=$(docker ps --filter "label=com.docker.swarm.task.id=${task_id}" --format '{{.ID}}' | head -n1)
+                    if [ -n "$container_id" ]; then
+                        health_status=$(docker inspect "$container_id" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' 2>/dev/null)
+                        if [ "$health_status" = "healthy" ] || [ "$health_status" = "no-healthcheck" ]; then
+                          old_healthy_count=$((old_healthy_count + 1))
+                        fi
+                    fi
+                  fi
+                done <<< "$service_tasks"
+              fi
+
+              if [ "$total_new_count" -gt 0 ] && [ "$unhealthy_count" -eq 0 ]; then
+                echo "✅ All $total_new_count new containers of service '$SERVICE_NAME' are healthy."
+                if [ "$old_healthy_count" -gt 0 ]; then
+                  echo "🔄 $old_healthy_count old containers will be stopped by Docker Swarm."
+                fi
+                break
+              elif [ "$total_new_count" -eq 0 ]; then
+                echo "⏳ No new tasks with new image detected yet, waiting for deployment to start... [${ELAPSED}s elapsed]"
+              else
+                echo "⚠️ $unhealthy_count/$total_new_count new containers are not yet healthy, waiting... [${ELAPSED}s elapsed]"
+                if [ "$old_healthy_count" -gt 0 ]; then
+                  echo "ℹ️ $old_healthy_count old containers are still serving traffic"
+                fi
+              fi
+
+              sleep 3
+            done
+
+            echo "⏳ Waiting for service '$SERVICE_NAME' to have correct replicas..."
+            while ! docker service ls --filter name="$SERVICE_NAME" \
+              --format '{{.Replicas}}' | grep -qE '^([0-9]+)/\1$'; do
+              CURRENT_TIME=$(date +%s)
+              ELAPSED=$((CURRENT_TIME - HEALTH_CHECK_START))
+              if (( ELAPSED > HEALTH_CHECK_TIMEOUT )); then
+                echo "❌ Timeout waiting for service scaling after ${ELAPSED}s."
+                docker service ps "$SERVICE_NAME" --no-trunc
+                exit 1
+              fi
+              sleep 2
+            done
+            echo "✅ Service '$SERVICE_NAME' has correct replicas."
+
+            echo "⏳ Waiting to check if rollback happened..."
+            sleep 3
+            DEPLOYED_IMAGE_TAG=$(docker service ps "$SERVICE_NAME" --no-trunc --filter desired-state=running --format '{{.Image}}' 2>/dev/null | head -n1 | cut -d'@' -f1 || echo "not_found")
+
+            echo "EXPECT_IMAGE_TAG=$EXPECT_IMAGE_TAG"
+            echo "DEPLOYED_IMAGE_TAG=$DEPLOYED_IMAGE_TAG"
+            if [[ "$DEPLOYED_IMAGE_TAG" != "$EXPECT_IMAGE_TAG" ]]; then
+              echo "❌ Rollback detected: service is running '$DEPLOYED_IMAGE_TAG' instead of '$EXPECT_IMAGE_TAG'"
+              docker service ps "$SERVICE_NAME" --no-trunc || true
+              docker service inspect "$SERVICE_NAME" --pretty || true
+              exit 1
+            fi
+
+            echo "🧹 Cleaning up Docker..."
+            if pgrep -f "docker system prune" > /dev/null; then
+              echo "Another prune is running, skip"
+              true
+            else
+              docker system prune -a -f
+            fi
+
+            echo "🔧 Git cleanup for next deployment"
+            git reset --hard HEAD || true
+            git clean -fd || true
+
+            rm -f docker-compose.deploy.yml || true
+
+            echo "✅ Successfully deployed frontend: $DEPLOYED_IMAGE_TAG"
+
+      - name: Notify GitHub on success
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              github.rest.repos.createCommitComment({
+                owner: '${{ github.repository_owner }}',
+                repo: '${{ github.event.repository.name }}',
+                commit_sha: '${{ github.sha }}',
+                body: '✅ Frontend deployment successful!\n[Workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})'
+              });
+            } catch (error) {
+              console.log('Failed to create commit comment:', error.message);
+            }
+
+      - name: Notify Google Chat on success
+        if: success()
+        run: |
+          curl -X POST -H 'Content-Type: application/json' \
+            -d '{"text": "✅ *[TTS Frontend] Deployment successful !*\n- Workflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"}' \
+            '${{ secrets.GOOGLE_CHAT_WEBHOOK }}'
+
+      - name: Notify GitHub on failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              github.rest.repos.createCommitComment({
+                owner: '${{ github.repository_owner }}',
+                repo: '${{ github.event.repository.name }}',
+                commit_sha: '${{ github.sha }}',
+                body: '❌ Frontend deployment failed! Please check the logs for details.\n[Workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})'
+              });
+            } catch (error) {
+              console.log('Failed to create commit comment:', error.message);
+            }
+
+      - name: Notify Google Chat on failure
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-Type: application/json' \
+            -d '{"text": "❌ *[TTS Frontend] Deployment failed !*\n- Workflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"}' \
+            '${{ secrets.GOOGLE_CHAT_WEBHOOK }}'

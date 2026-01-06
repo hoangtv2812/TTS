@@ -31,9 +31,6 @@ services:
     env_file:
       - "./backend/docker/docker-compose.env"
     working_dir: /usr/src/app
-    volumes:
-      - ./backend:/usr/src/app
-      - backend_node_modules:/usr/src/app/node_modules
     ports:
       - "3001:3001"
     command: npm run dev
@@ -44,8 +41,6 @@ services:
   frontend:
     image: tts_frontend:dev
     container_name: tts_frontend
-    volumes:
-      - ./frontend/:/usr/src/app
     ports:
       - "5173:5173"
     networks:
@@ -57,9 +52,3 @@ networks:
     name: "tts_network"
 volumes:
   tts_postgres_data:
-  backend_node_modules:
-    driver: local
-    driver_opts:
-      o: bind
-      type: none
-      device: ${PWD}/backend/node_modules
