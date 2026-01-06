@@ -1,6 +1,6 @@
 services:
   gateway:
-    image: ecomobile/server_image:tts_gateway
+    image: vhoang2812/server_image:tts_gateway
     ports:
       - "80:80"
     deploy:
@@ -28,7 +28,7 @@ services:
       - frontend
 
   backend:
-    image: ecomobile/server_image:tts_backend
+    image: vhoang2812/server_image:tts_backend
     # Ports removed to secure service behind gateway
     volumes:
       - ./backend/public:/app/public
@@ -57,9 +57,13 @@ services:
     healthcheck:
       test:
         ["CMD-SHELL", "curl -f http://127.0.0.1:3001/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend:
-    image: ecomobile/server_image:tts_frontend
+    image: vhoang2812/server_image:tts_frontend
     # Ports removed to secure service behind gateway
     networks:
       tts_network:
@@ -83,6 +87,10 @@ services:
         window: 5s
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
   tts_network:
