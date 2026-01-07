@@ -24,25 +24,43 @@ test:
 test_coverage:
 	docker exec -it tts_backend sh -c "npm run test:coverage"
 
+# Local Build Commands (For Mac Silicon / ARM64)
+build_backend_local:
+	cd backend && docker build -f Dockerfile.prod --platform linux/arm64 -t vhoang2812/server_image:tts_backend_local .
+build_frontend_local:
+	cd frontend && docker build -f Dockerfile.prod --platform linux/arm64 -t vhoang2812/server_image:tts_frontend_local .
+build_gateway_local:
+	cd nginx_gateway && docker build -f Dockerfile --platform linux/arm64 -t vhoang2812/server_image:tts_gateway_local .
+
 # Production build and push commands
 build_backend_prod:
 	cd backend && docker build -f Dockerfile.prod --platform linux/amd64 -t vhoang2812/server_image:tts_backend .
 build_push_backend_prod:
-	cd backend && docker build -f Dockerfile.prod -t vhoang2812/server_image:tts_backend . && docker push vhoang2812/server_image:tts_backend
+	cd backend && docker build -f Dockerfile.prod --platform linux/amd64 -t vhoang2812/server_image:tts_backend . && docker push vhoang2812/server_image:tts_backend
+
 build_frontend_prod:
-	cd frontend && docker build -f Dockerfile.prod -t vhoang2812/server_image:tts_frontend .
+	cd frontend && docker build -f Dockerfile.prod --platform linux/amd64 -t vhoang2812/server_image:tts_frontend .
 build_push_frontend_prod:
-	cd frontend && docker build -f Dockerfile.prod -t vhoang2812/server_image:tts_frontend . && docker push vhoang2812/server_image:tts_frontend
+	cd frontend && docker build -f Dockerfile.prod --platform linux/amd64 -t vhoang2812/server_image:tts_frontend . && docker push vhoang2812/server_image:tts_frontend
+
 build_gateway_prod:
 	cd nginx_gateway && docker build -f Dockerfile --platform linux/amd64 -t vhoang2812/server_image:tts_gateway .
 build_push_gateway_prod:
-	cd nginx_gateway && docker build -f Dockerfile -t vhoang2812/server_image:tts_gateway . && docker push vhoang2812/server_image:tts_gateway
+	cd nginx_gateway && docker build -f Dockerfile --platform linux/amd64 -t vhoang2812/server_image:tts_gateway . && docker push vhoang2812/server_image:tts_gateway
 
 # Production deployment to Docker Swarm
 swarm:
 	docker swarm init --advertise-addr 127.0.0.1
 stack:
 	docker stack deploy --compose-file docker-compose.prod.yml tts
+stack_local:
+	cp docker-compose.prod.yml docker-compose.local.yml
+	sed -i '' 's|vhoang2812/server_image:tts_backend|vhoang2812/server_image:tts_backend_local|g' docker-compose.local.yml
+	sed -i '' 's|vhoang2812/server_image:tts_frontend|vhoang2812/server_image:tts_frontend_local|g' docker-compose.local.yml
+	sed -i '' 's|vhoang2812/server_image:tts_gateway|vhoang2812/server_image:tts_gateway_local|g' docker-compose.local.yml
+	docker stack deploy --compose-file docker-compose.local.yml tts
+	rm docker-compose.local.yml
+
 force_backend:
 	docker service update --force tts_backend
 force_frontend:
