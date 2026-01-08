@@ -61,7 +61,7 @@ jobs:
             set -e
             set -o pipefail
 
-            cd /Workspace/tts || { echo "❌ Failed to change directory"; exit 1; }
+            cd ~/Workspace/tts || { echo "❌ Failed to change directory"; exit 1; }
 
             HEALTH_CHECK_TIMEOUT=65
             STACK_NAME=tts

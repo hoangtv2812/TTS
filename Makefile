@@ -85,25 +85,35 @@ confirm_production:
 	fi
 	@echo "✅ Confirmations passed!"
 
-deploy_backend_production: confirm_production
+deploy_backend_production:
 	@echo "🚀 Starting production backend deployment..."
-	git checkout master
-	git pull origin master
+# 	git checkout master
+# 	git pull origin master
+# 	git branch -D deploy-backend-production || true
+# 	git checkout -b deploy-backend-production
+# 	git push origin deploy-backend-production -f
+# 	git checkout master
+	git checkout update_ci_cd
 	git branch -D deploy-backend-production || true
 	git checkout -b deploy-backend-production
 	git push origin deploy-backend-production -f
-	git checkout master
+	git checkout update_ci_cd
 
-deploy_frontend_production: confirm_production
+deploy_frontend_production:
 	@echo "🚀 Starting production frontend deployment..."
-	git checkout master
-	git pull origin master
+# 	git checkout master
+# 	git pull origin master
+# 	git branch -D deploy-frontend-production || true
+# 	git checkout -b deploy-frontend-production
+# 	git push origin deploy-frontend-production -f
+# 	git checkout master
+	git checkout update_ci_cd
 	git branch -D deploy-frontend-production || true
 	git checkout -b deploy-frontend-production
 	git push origin deploy-frontend-production -f
-	git checkout master
+	git checkout update_ci_cd
 
-deploy_production: confirm_production
+deploy_production:
 	@echo "🚀 Starting full production deployment (backend + frontend + gateway)..."
 	git checkout master
 	git pull origin master
