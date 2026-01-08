@@ -168,7 +168,6 @@ jobs:
                   fi
                 done <<< "$service_tasks"
               fi
-
               # Logic điều kiện thoát vòng lặp
               if [ "$total_new_count" -gt 0 ] && [ "$unhealthy_count" -eq 0 ]; then
                 echo "✅ All $total_new_count new containers of service '$SERVICE_NAME' are healthy."
