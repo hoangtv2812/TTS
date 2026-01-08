@@ -71,11 +71,11 @@ jobs:
             EXPECT_IMAGE_TAG=vhoang2812/server_image:tts_frontend_${{ github.sha }}
 
             # Git operations
-            git fetch origin production_frontend_deployment || { echo "❌ Failed to fetch from origin"; exit 1; }
+            git fetch origin deploy-frontend-production || { echo "❌ Failed to fetch from origin"; exit 1; }
             git add . || { echo "❌ Failed to stage changes"; exit 1; }
             git checkout -f || { echo "❌ Failed to force checkout"; exit 1; }
-            git checkout production_frontend_deployment || git checkout -b production_frontend_deployment origin/production_frontend_deployment || { echo "❌ Failed to checkout production_frontend_deployment branch"; exit 1; }
-            git reset --hard origin/production_frontend_deployment || { echo "❌ Failed to reset to latest production_frontend_deployment"; exit 1; }
+            git checkout deploy-frontend-production || git checkout -b deploy-frontend-production origin/deploy-frontend-production || { echo "❌ Failed to checkout deploy-frontend-production branch"; exit 1; }
+            git reset --hard origin/deploy-frontend-production || { echo "❌ Failed to reset to latest deploy-frontend-production"; exit 1; }
 
             # Docker login
             echo "🔐 Logging in to Docker Hub..."
