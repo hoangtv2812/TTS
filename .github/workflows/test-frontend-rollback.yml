@@ -1,0 +1,81 @@
+name: Test Frontend Rollback (Manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test_rollback_behavior:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH to VPS and Trigger Bad Update
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST_TTS }}
+          username: ${{ secrets.SERVER_USER_TTS }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_TTS }}
+          port: ${{ secrets.SERVER_PORT_TTS }}
+          script: |
+            SERVICE_NAME="tts_frontend"
+            
+            echo "========================================================"
+            echo "🔍 TRẠNG THÁI HIỆN TẠI:"
+            docker service ps $SERVICE_NAME --filter "desired-state=running" --no-trunc
+            
+            echo "========================================================"
+            echo "💣 BẮT ĐẦU GÂY LỖI (Simulate Bad Deployment)..."
+            echo "👉 Lệnh: docker service update --health-cmd 'exit 1' ..."
+            
+            # Cập nhật service với Healthcheck luôn fail (exit 1)
+            # --update-failure-action rollback: Đảm bảo Swarm sẽ rollback khi fail
+            # --update-monitor 10s: Thời gian theo dõi lỗi
+            # --detach=true: Chạy ngầm để ta có thể in log quan sát ở dưới
+            
+            docker service update \
+              --health-cmd "exit 1" \
+              --health-interval 5s \
+              --health-retries 2 \
+              --update-failure-action rollback \
+              --update-monitor 15s \
+              --force \
+              --detach=true \
+              $SERVICE_NAME
+            
+            echo "✅ Đã gửi lệnh update. Đang theo dõi quá trình Rollback..."
+            echo "========================================================"
+            
+            # Vòng lặp theo dõi trong 60 giây
+            START_TIME=$(date +%s)
+            while true; do
+                CURRENT_TIME=$(date +%s)
+                ELAPSED=$((CURRENT_TIME - START_TIME))
+                
+                if [ $ELAPSED -gt 90 ]; then
+                    echo "Hết thời gian theo dõi."
+                    break
+                fi
+                
+                echo "--- Time: ${ELAPSED}s ---"
+                # In ra danh sách task, hiển thị cả task cũ và mới
+                docker service ps $SERVICE_NAME --no-trunc | head -n 10
+                echo "------------------------"
+                
+                # Kiểm tra xem có task nào bị rollback chưa
+                # Trạng thái rollback thường để lại dấu vết là task mới bị Shutdown/Failed và task cũ Running
+                
+                sleep 5
+            done
+            
+            echo "========================================================"
+            echo "🔍 KẾT QUẢ CUỐI CÙNG:"
+            docker service ps $SERVICE_NAME --filter "desired-state=running" --no-trunc
+            
+            # Kiểm tra xem healthcheck đã quay về ban đầu chưa (không phải exit 1)
+            CURRENT_HEALTH_CMD=$(docker service inspect $SERVICE_NAME --format '{{.Spec.TaskTemplate.ContainerSpec.Healthcheck.Test}}')
+            echo "Healthcheck Command hiện tại: $CURRENT_HEALTH_CMD"
+            
+            if [[ "$CURRENT_HEALTH_CMD" == *"[exit 1]"* ]]; then
+               echo "❌ TEST THẤT BẠI: Service vẫn giữ cấu hình lỗi (Chưa rollback)."
+               exit 1
+            else
+               echo "✅ TEST THÀNH CÔNG: Service đã rollback về cấu hình cũ (Healthcheck chuẩn)."
+            fi
