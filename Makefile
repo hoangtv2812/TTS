@@ -115,9 +115,14 @@ deploy_frontend_production:
 
 deploy_production:
 	@echo "🚀 Starting full production deployment (backend + frontend + gateway)..."
-	git checkout master
-	git pull origin master
+# 	git checkout master
+# 	git pull origin master
+# 	git branch -D deploy-production || true
+# 	git checkout -b deploy-production
+# 	git push origin deploy-production -f
+# 	git checkout master
+	git checkout update_ci_cd
 	git branch -D deploy-production || true
 	git checkout -b deploy-production
 	git push origin deploy-production -f
-	git checkout master
+	git checkout update_ci_cd
