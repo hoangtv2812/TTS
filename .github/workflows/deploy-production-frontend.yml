@@ -79,7 +79,7 @@ jobs:
 
             # Docker login
             echo "🔐 Logging in to Docker Hub..."
-            echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u ecomobile --password-stdin || { echo "❌ Failed to login to Docker Hub"; exit 1; }
+            echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u vhoang2812 --password-stdin || { echo "❌ Failed to login to Docker Hub"; exit 1; }
 
             # Pull frontend image with retry and timeout
             echo "⬇️ Pulling frontend image..."
@@ -93,7 +93,7 @@ jobs:
             cp docker-compose.prod.yml docker-compose.deploy.yml || { echo "❌ Failed to copy docker-compose"; exit 1; }
 
             echo "🔁 Updating image tag with SHA..."
-            sed -i "s|image: .*/server_image:ai_school_production_frontend.*|image: ${EXPECT_IMAGE_TAG}|g" docker-compose.deploy.yml || { echo "❌ Failed to update frontend image"; exit 1; }
+            sed -i "s|image: .*/server_image:=tts_frontend.*|image: ${EXPECT_IMAGE_TAG}|g" docker-compose.deploy.yml || { echo "❌ Failed to update frontend image"; exit 1; }
 
             # Initialize Docker Swarm if needed
             docker swarm init --advertise-addr 127.0.0.1 || true
