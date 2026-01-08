@@ -71,11 +71,11 @@ jobs:
             EXPECT_IMAGE_TAG=vhoang2812/server_image:tts_frontend_${{ github.sha }}
 
             # Git operations
-            git fetch origin deploy-frontend-production || { echo "❌ Failed to fetch from origin"; exit 1; }
+            git fetch origin production_frontend_deployment || { echo "❌ Failed to fetch from origin"; exit 1; }
             git add . || { echo "❌ Failed to stage changes"; exit 1; }
             git checkout -f || { echo "❌ Failed to force checkout"; exit 1; }
-            git checkout deploy-frontend-production || git checkout -b deploy-frontend-production origin/deploy-frontend-production || { echo "❌ Failed to checkout deploy-frontend-production branch"; exit 1; }
-            git reset --hard origin/deploy-frontend-production || { echo "❌ Failed to reset to latest deploy-frontend-production"; exit 1; }
+            git checkout production_frontend_deployment || git checkout -b production_frontend_deployment origin/production_frontend_deployment || { echo "❌ Failed to checkout production_frontend_deployment branch"; exit 1; }
+            git reset --hard origin/production_frontend_deployment || { echo "❌ Failed to reset to latest production_frontend_deployment"; exit 1; }
 
             # Docker login
             echo "🔐 Logging in to Docker Hub..."
@@ -92,19 +92,8 @@ jobs:
             echo "🛠 Creating temporary docker-compose.deploy.yml..."
             cp docker-compose.prod.yml docker-compose.deploy.yml || { echo "❌ Failed to copy docker-compose"; exit 1; }
 
-            # echo "🔍 Fetching currently running images to prevent accidental updates..."
-            # CURRENT_BACKEND=$(docker service inspect tts_backend --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' 2>/dev/null || echo "vhoang2812/server_image:tts_backend")
-            # CURRENT_GATEWAY=$(docker service inspect tts_gateway --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' 2>/dev/null || echo "vhoang2812/server_image:tts_gateway")
-
-            # 5. THAY THẾ IMAGE:
-            # - Frontend: Dùng SHA mới
-            # - Backend & Gateway: Dùng đúng cái đang chạy (giúp Swarm bỏ qua việc update)
-            # sed -i "s|image: .* # image_frontend|image: ${NEW_FRONTEND_TAG} # image_frontend|g" docker-compose.deploy.yml
-            # sed -i "s|image: .* # image_backend|image: ${CURRENT_BACKEND} # image_backend|g" docker-compose.deploy.yml
-            # sed -i "s|image: .* # image_gateway|image: ${CURRENT_GATEWAY} # image_gateway|g" docker-compose.deploy.yml
-
             echo "🔁 Updating image tag with SHA..."
-            sed -i "s|image: .*/server_image:tts_frontend.*|image: ${EXPECT_IMAGE_TAG}|g" docker-compose.deploy.yml || { echo "❌ Failed to update frontend image"; exit 1; }
+            sed -i "s|image: .*/server_image:=tts_frontend.*|image: ${EXPECT_IMAGE_TAG}|g" docker-compose.deploy.yml || { echo "❌ Failed to update frontend image"; exit 1; }
 
             # Initialize Docker Swarm if needed
             docker swarm init --advertise-addr 127.0.0.1 || true
@@ -148,6 +137,7 @@ jobs:
                   [ -z "$task_id" ] && continue
                   clean_task_image=$(echo "$task_image" | cut -d'@' -f1)
 
+                  # Kiểm tra xem đây có phải là task của image mới không
                   if [ "$clean_task_image" = "$EXPECT_IMAGE_TAG" ]; then
                     total_new_count=$((total_new_count + 1))
 
@@ -162,10 +152,12 @@ jobs:
                         echo "✅ New container $task_name: $health_status [${ELAPSED}s elapsed]"
                       fi
                     else
+                      # Container mới chưa start
                       unhealthy_count=$((unhealthy_count + 1))
                       echo "⏳ Waiting for new container of task ${task_id:0:12} to start... [${ELAPSED}s elapsed]"
                     fi
                   else
+                    # Xử lý container cũ
                     container_id=$(docker ps --filter "label=com.docker.swarm.task.id=${task_id}" --format '{{.ID}}' | head -n1)
                     if [ -n "$container_id" ]; then
                         health_status=$(docker inspect "$container_id" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' 2>/dev/null)
@@ -177,6 +169,7 @@ jobs:
                 done <<< "$service_tasks"
               fi
 
+              # Logic điều kiện thoát vòng lặp
               if [ "$total_new_count" -gt 0 ] && [ "$unhealthy_count" -eq 0 ]; then
                 echo "✅ All $total_new_count new containers of service '$SERVICE_NAME' are healthy."
                 if [ "$old_healthy_count" -gt 0 ]; then
@@ -222,6 +215,7 @@ jobs:
               exit 1
             fi
 
+            # Clean up unused Docker resources
             echo "🧹 Cleaning up Docker..."
             if pgrep -f "docker system prune" > /dev/null; then
               echo "Another prune is running, skip"
@@ -230,12 +224,13 @@ jobs:
               docker system prune -a -f
             fi
 
+
+            # Final clean up
             echo "🔧 Git cleanup for next deployment"
+            # Clean up any remaining staged files
             git reset --hard HEAD || true
+            # Remove any untracked files/directories
             git clean -fd || true
-
-            rm -f docker-compose.deploy.yml || true
-
             echo "✅ Successfully deployed frontend: $DEPLOYED_IMAGE_TAG"
 
       - name: Notify GitHub on success
