@@ -36,7 +36,7 @@ jobs:
               --health-cmd "exit 1" \
               --health-interval 5s \
               --health-retries 2 \
-              --update-failure-action rollback \
+              # --update-failure-action rollback \
               --update-monitor 15s \
               --force \
               --detach=true \
