@@ -104,7 +104,6 @@ jobs:
             echo "RUNNING_IMAGE_TAG=$RUNNING_IMAGE_TAG"
             echo "EXPECT_IMAGE_TAG=$EXPECT_IMAGE_TAG"
 
-            # if [ "$RUNNING_IMAGE_TAG" = "$EXPECT_IMAGE_TAG" ]; then
             #   echo "♻️ Same image, force update"
             docker service update --image "$EXPECT_IMAGE_TAG" --with-registry-auth "$SERVICE_NAME" || { echo "❌ Failed to force update service"; exit 1; }
 
