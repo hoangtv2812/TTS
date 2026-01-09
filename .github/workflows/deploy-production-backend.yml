@@ -104,7 +104,7 @@ jobs:
 
             # if [ "$RUNNING_IMAGE_TAG" = "$EXPECT_IMAGE_TAG" ]; then
             #   echo "♻️ Same image, force update"
-            docker service update --force "$SERVICE_NAME" || { echo "❌ Failed to force update service"; exit 1; }
+            docker service update --image "$EXPECT_IMAGE_TAG" --with-registry-auth "$SERVICE_NAME" || { echo "❌ Failed to force update service"; exit 1; }
             # else
             #   echo "🚀 New image, deploy stack"
             #   docker stack deploy --with-registry-auth --compose-file docker-compose.deploy.yml "$STACK_NAME" || { echo "❌ Failed to deploy stack"; exit 1; }
