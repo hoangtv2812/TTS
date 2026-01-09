@@ -102,13 +102,20 @@ jobs:
             echo "RUNNING_IMAGE_TAG=$RUNNING_IMAGE_TAG"
             echo "EXPECT_IMAGE_TAG=$EXPECT_IMAGE_TAG"
 
-            # if [ "$RUNNING_IMAGE_TAG" = "$EXPECT_IMAGE_TAG" ]; then
-            #   echo "♻️ Same image, force update"
-            docker service update --image "$EXPECT_IMAGE_TAG" --with-registry-auth "$SERVICE_NAME" || { echo "❌ Failed to force update service"; exit 1; }
-            # else
-            #   echo "🚀 New image, deploy stack"
-            #   docker stack deploy --with-registry-auth --compose-file docker-compose.deploy.yml "$STACK_NAME" || { echo "❌ Failed to deploy stack"; exit 1; }
-            # fi
+            if [ "$RUNNING_IMAGE_TAG" = "$EXPECT_IMAGE_TAG" ]; then
+              echo "♻️ Same image, force update backend services"
+              docker service update --image "$EXPECT_IMAGE_TAG" "${STACK_NAME}" || { echo "❌ Failed to force update backend"; exit 1; }
+            else
+              echo "🚀 New image, update backend services only"
+              # Ensure services exist or create from stack
+              if ! docker service inspect "${STACK_NAME}" >/dev/null 2>&1; then
+                echo "Services not found, deploying full stack first..."
+                docker stack deploy --with-registry-auth --compose-file docker-compose.deploy.yml "$STACK_NAME" || { echo "❌ Failed to deploy stack"; exit 1; }
+              else
+                # Update only backend-related services
+                docker service update --image "$EXPECT_IMAGE_TAG" "${STACK_NAME}" || { echo "❌ Failed to update backend"; exit 1; }
+              fi
+            fi
 
             sleep 10
 
