@@ -104,13 +104,13 @@ jobs:
             echo "RUNNING_IMAGE_TAG=$RUNNING_IMAGE_TAG"
             echo "EXPECT_IMAGE_TAG=$EXPECT_IMAGE_TAG"
 
-            if [ "$RUNNING_IMAGE_TAG" = "$EXPECT_IMAGE_TAG" ]; then
-              echo "♻️ Same image, force update"
-              docker service update --force "$SERVICE_NAME" || { echo "❌ Failed to force update service"; exit 1; }
-            else
-              echo "🚀 New image, deploy stack"
-              docker stack deploy --with-registry-auth --compose-file docker-compose.deploy.yml "$STACK_NAME" || { echo "❌ Failed to deploy stack"; exit 1; }
-            fi
+            # if [ "$RUNNING_IMAGE_TAG" = "$EXPECT_IMAGE_TAG" ]; then
+            #   echo "♻️ Same image, force update"
+            docker service update --force "$SERVICE_NAME" || { echo "❌ Failed to force update service"; exit 1; }
+            # else
+            #   echo "🚀 New image, deploy stack"
+            #   docker stack deploy --with-registry-auth --compose-file docker-compose.deploy.yml "$STACK_NAME" || { echo "❌ Failed to deploy stack"; exit 1; }
+            # fi
 
             sleep 10
 
