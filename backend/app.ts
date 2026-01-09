@@ -29,4 +29,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.status(404).send("Sorry can't find that!");
 });
 
+// Error handler that crashes the app
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error('Fatal error:', err);
+  process.exit(1); // Crash the app
+});
+
 export default app;
